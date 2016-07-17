@@ -2,12 +2,10 @@ var http = require('http');
 var m = require('mraa');
 var doorOpenPin = new m.Gpio(3);
 var doorClosePin = new m.Gpio(5);
-var Accessory, Service, Characteristic, UUIDGen;
+var Accessory, Service, Characteristic;
 var fullCycleTime = 30000;
 
 module.exports = function(homebridge) {
-  console.log("homebridge API version: " + homebridge.version);
-
   Service = homebridge.hap.Service;
   Characteristic = homebridge.hap.Characteristic;
   
@@ -23,10 +21,9 @@ module.exports = function(homebridge) {
 function ChickenCoopDoorAccessory(log, config) {
   this.log = log;
   this.name = config["name"];
-  this.doorOpen = false; // Closed.
+  this.state = Characteristic.CurrentDoorState.CLOSED;
   
   this.service = new Service.GarageDoorOpener(this.name);
-
   this.service.getCharacteristic(Characteristic.CurrentDoorState)
     .on('get', this.getState.bind(this));
   
@@ -37,12 +34,11 @@ function ChickenCoopDoorAccessory(log, config) {
 }
 
 ChickenCoopDoorAccessory.prototype.getState = function(callback) {
-  callback(null, this.doorOpen ? Characteristic.CurrentDoorState.OPEN : Characteristic.CurrentDoorState.CLOSED );
+  callback(null, this.state);
 }
   
 ChickenCoopDoorAccessory.prototype.setState = function(state, callback) {
-  var open = state == Characteristic.CurrentDoorState.OPEN ? true : false;
-  if (open) {
+  if (state == Characteristic.CurrentDoorState.OPEN) {
   	this.open(callback);  
   } else {
   	this.close(callback);  
@@ -56,11 +52,12 @@ ChickenCoopDoorAccessory.prototype.getServices = function() {
 ChickenCoopDoorAccessory.prototype.open = function(callback) {
   var self = this;
   doorOpenPin.write(0);
-  self.service.setCharacteristic(Characteristic.CurrentDoorState, Characteristic.CurrentDoorState.OPENING);
+  self.state = Characteristic.CurrentDoorState.OPENING;
+  self.service.setCharacteristic(Characteristic.CurrentDoorState, self.state);
   setTimeout(function() {
     doorOpenPin.write(1);
-    self.doorOpen = true;
-    self.service.setCharacteristic(Characteristic.CurrentDoorState, Characteristic.CurrentDoorState.OPEN);
+    self.state = Characteristic.CurrentDoorState.OPEN;
+    self.service.setCharacteristic(Characteristic.CurrentDoorState, self.state);
     callback(null);
   }, fullCycleTime);
 }
@@ -68,11 +65,12 @@ ChickenCoopDoorAccessory.prototype.open = function(callback) {
 ChickenCoopDoorAccessory.prototype.close = function(callback) {
   var self = this;
   doorClosePin.write(0);
-  self.service.setCharacteristic(Characteristic.CurrentDoorState, Characteristic.CurrentDoorState.CLOSING);
+  self.state = Characteristic.CurrentDoorState.CLOSING;
+  self.service.setCharacteristic(Characteristic.CurrentDoorState, self.state);
   setTimeout(function() {
     doorClosePin.write(1);
-    self.doorOpen = false;
-    self.service.setCharacteristic(Characteristic.CurrentDoorState, Characteristic.CurrentDoorState.CLOSED);
+    self.state = Characteristic.CurrentDoorState.CLOSED;
+    self.service.setCharacteristic(Characteristic.CurrentDoorState, self.state);
     callback(null);
   }, fullCycleTime);
 }
